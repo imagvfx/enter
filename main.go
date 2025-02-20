@@ -29,19 +29,20 @@ func main() {
 	}
 	host := args[0]
 	// check existing session is valid
-	var session []byte
-	session, err := readConfigFile("session")
+	b, err := readConfigFile("session")
 	if err != nil {
 		if !os.IsNotExist(err) {
 			log.Fatalf("read session: %v", err)
 		}
 	}
-	if session != nil {
+	if b != nil {
+		session := string(b)
 		ok, err := testSession(host, string(session))
 		if err != nil {
 			log.Fatalf("test session: %v", err)
 		}
 		if ok {
+			fmt.Println(session)
 			return
 		}
 	}
@@ -63,6 +64,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("write session: %v", err)
 	}
+	fmt.Println(s.Session)
 }
 
 // generateRandomString returns random string that has length 'n', using alpha-numeric characters.
