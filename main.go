@@ -28,6 +28,24 @@ func main() {
 		return
 	}
 	host := args[0]
+	// check existing session is valid
+	var session []byte
+	session, err := readConfigFile("session")
+	if err != nil {
+		if !os.IsNotExist(err) {
+			log.Fatalf("read session: %v", err)
+		}
+	}
+	if session != nil {
+		ok, err := testSession(host, string(session))
+		if err != nil {
+			log.Fatalf("test session: %v", err)
+		}
+		if ok {
+			return
+		}
+	}
+	// don't have valid session, get a new session
 	key, err := generateRandomString(64)
 	if err != nil {
 		log.Fatalf("generate random string: %v", err)
@@ -40,7 +58,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("get session info: %v", err)
 	}
-	data := []byte(s.User + " " + s.Session)
+	data := []byte(s.Session)
 	err = writeConfigFile("session", data)
 	if err != nil {
 		log.Fatalf("write session: %v", err)
@@ -124,6 +142,41 @@ func getSession(host, key string) (session, error) {
 		return session{}, err
 	}
 	return s, nil
+}
+
+// testSession tests the session from the forge host.
+func testSession(host, session string) (bool, error) {
+	resp, err := http.PostForm("https://"+host+"/api/test-session", url.Values{
+		"session": {string(session)},
+	})
+	if err != nil {
+		return false, err
+	}
+	var ok bool
+	err = decodeAPIResponse(resp, &ok)
+	if err != nil {
+		// assume this is a invalid session.
+		return false, nil
+	}
+	return ok, nil
+}
+
+// readConfigFile writes data to a config file.
+func readConfigFile(filename string) ([]byte, error) {
+	confd, err := os.UserConfigDir()
+	if err != nil {
+		return nil, err
+	}
+	f, err := os.Open(confd + "/forge/" + filename)
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+	data, err := io.ReadAll(f)
+	if err != nil {
+		return nil, err
+	}
+	return data, nil
 }
 
 // writeConfigFile writes data to a config file.
